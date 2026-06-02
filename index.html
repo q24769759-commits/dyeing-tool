@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>染程工具</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Microsoft JhengHei", Arial, sans-serif;
+      background: #f5f5f5;
+      color: #333;
+      padding: 24px 0;
+      min-width: 960px;
+    }
+
+    .page-wrap {
+      width: 900px;
+      margin: 0 auto;
+    }
+
+    h1 { font-size: 20px; margin-bottom: 16px; letter-spacing: 1px; }
+
+    /* ── 染程基本資訊列 ── */
+    .process-meta {
+      display: flex;
+      align-items: center;
+      gap: 28px;
+      margin-bottom: 16px;
+      padding: 12px 16px;
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.12);
+      font-size: 22px;
+    }
+    .process-meta label { color: #555; margin-right: 4px; }
+    .process-meta input[type="text"] {
+      border: 1px solid #bbb;
+      border-radius: 4px;
+      padding: 5px 10px;
+      font-size: 22px;
+      font-family: inherit;
+      width: 260px;
+      color: #222;
+    }
+    .meta-time-val { color: #1a5276; font-weight: bold; font-size: 22px; }
+
+    /* 圖上方資訊列 */
+    .chart-header {
+      display: flex;
+      align-items: baseline;
+      gap: 20px;
+      margin-bottom: 10px;
+    }
+    .chart-proc-name { font-size: 22px; font-weight: bold; color: #1a5276; }
+    .chart-proc-time { font-size: 22px; color: #444; }
+
+    /* ── 表格 ── */
+    .table-wrap {
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.12);
+      overflow-x: auto;
+      margin-bottom: 24px;
+      padding: 16px;
+    }
+
+    table { border-collapse: collapse; width: 100%; min-width: 540px; }
+
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px 10px;
+      text-align: center;
+      font-size: 14px;
+      white-space: nowrap;
+    }
+
+    th { background: #4a7c9e; color: #fff; font-weight: normal; }
+    tr:nth-child(even) td { background: #f9f9f9; }
+
+    /* 輸入框無邊框，截圖時像純文字 */
+    td input[type="number"] {
+      width: 68px; border: none; background: transparent;
+      font-size: 14px; text-align: center; color: #222; padding: 2px;
+    }
+    td input[type="number"]:focus {
+      background: #e8f4fb; border-radius: 3px; outline: 1px solid #4a7c9e;
+    }
+
+    td.rate { color: #333; background: #edf2f7; font-weight: bold; }
+
+    td.type-hold { color: #1a5276; background: #d6eaf8; font-weight: bold; font-size: 13px; }
+    td.type-heat { color: #7b241c; background: #fadbd8; font-weight: bold; font-size: 13px; }
+    td.type-cool { color: #4a235a; background: #e8daef; font-weight: bold; font-size: 13px; }
+
+    .stage-num { color: #555; font-size: 13px; font-weight: bold; }
+
+    /* ── 按鈕 ── */
+    .btn-row { margin-bottom: 20px; display: flex; gap: 8px; }
+    button { padding: 8px 18px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }
+    .btn-add  { background: #4a7c9e; color: #fff; }
+    .btn-del  { background: #c0392b; color: #fff; }
+
+    /* ── 曲線圖 ── */
+    .chart-wrap {
+      background: #fff; border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.12);
+      padding: 20px 24px;
+    }
+    .chart-title { font-size: 15px; margin-bottom: 12px; color: #444; }
+    .chart-area { width: 860px; }            /* 900px - 2*20px padding */
+    .chart-area svg { width: 860px; height: auto; display: block; }
+
+    /* ── 動作標示 ── */
+    .action-wrap {
+      background: #fff; border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.12);
+      padding: 16px; margin-top: 16px;
+    }
+    .section-title { font-size: 15px; margin-bottom: 12px; color: #444; }
+    .action-wrap table th { background: #6e7f8c; }
+    .action-input-text {
+      width: 200px; border: 1px solid #ccc; border-radius: 4px;
+      padding: 4px 6px; font-size: 14px;
+    }
+    .btn-remove {
+      background: #e8e8e8; color: #888; padding: 4px 10px;
+      font-size: 12px; border-radius: 4px;
+    }
+
+    /* ── 匯出區 ── */
+    .export-wrap {
+      background: #fff; border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.12);
+      padding: 16px; margin-top: 16px;
+    }
+    .export-btns { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+    .btn-export  { background: #2471a3; color: #fff; padding: 9px 18px; border-radius: 6px; font-size: 14px; }
+    .btn-export:hover { background: #1a5276; }
+    .export-tip  { font-size: 12px; color: #888; margin-top: 6px; }
+
+    /* ── Google Sheets 上傳區 ── */
+    .upload-wrap {
+      background: #fff; border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.12);
+      padding: 16px; margin-top: 16px;
+    }
+    .upload-url-row { display: flex; gap: 10px; align-items: center; margin: 10px 0; flex-wrap: wrap; }
+    .upload-url-row input[type="text"] {
+      flex: 1; min-width: 300px; border: 1px solid #bbb; border-radius: 4px;
+      padding: 7px 10px; font-size: 13px; font-family: inherit; color: #222;
+    }
+    .btn-upload { background: #1e8449; color: #fff; padding: 9px 20px; border-radius: 6px; font-size: 14px; }
+    .btn-upload:hover { background: #145a32; }
+    .upload-status { font-size: 13px; margin-top: 6px; min-height: 20px; }
+    .upload-status.ok   { color: #1e8449; }
+    .upload-status.err  { color: #c0392b; }
+    details.gas-setup { margin-top: 12px; font-size: 13px; }
+    details.gas-setup summary { cursor: pointer; color: #2471a3; font-weight: bold; }
+    .gas-code {
+      background: #f4f4f4; border: 1px solid #ddd; border-radius: 4px;
+      padding: 10px; font-family: Consolas, monospace; font-size: 12px;
+      white-space: pre; overflow-x: auto; margin: 8px 0;
+    }
+    .gas-steps { padding-left: 18px; line-height: 2; color: #444; }
+  </style>
+</head>
+<body>
+<div class="page-wrap">
+
+<h1>染程工具</h1>
+
+<!-- 染程基本資訊 -->
+<div class="process-meta">
+  <div>
+    <label>染程名稱：</label>
+    <input type="text" id="processName" placeholder="輸入染程編號或名稱">
+  </div>
+  <div>
+    <label>總染程時間：</label>
+    <span class="meta-time-val" id="totalTimeVal">—</span>
+    <span style="color:#666"> min</span>
+  </div>
+</div>
+
+<!-- 染程階段輸入表格 -->
+<div class="table-wrap">
+  <table id="stageTable">
+    <thead>
+      <tr>
+        <th>階段</th>
+        <th>初始溫度 °C</th>
+        <th>結束溫度 °C</th>
+        <th>時間 min</th>
+        <th>類型</th>
+        <th>升溫速率 °C/min</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="stage-num">1</td>
+        <td><input type="number" value="30"></td>
+        <td><input type="number" value="30"></td>
+        <td><input type="number" value="10"></td>
+        <td class="type-hold">持溫</td>
+        <td class="rate">—</td>
+      </tr>
+      <tr>
+        <td class="stage-num">2</td>
+        <td><input type="number" value="30"></td>
+        <td><input type="number" value="70"></td>
+        <td><input type="number" value="20"></td>
+        <td class="type-heat">升溫</td>
+        <td class="rate">2.00</td>
+      </tr>
+      <tr>
+        <td class="stage-num">3</td>
+        <td><input type="number" value="70"></td>
+        <td><input type="number" value="70"></td>
+        <td><input type="number" value="15"></td>
+        <td class="type-hold">持溫</td>
+        <td class="rate">—</td>
+      </tr>
+      <tr>
+        <td class="stage-num">4</td>
+        <td><input type="number" value="70"></td>
+        <td><input type="number" value="130"></td>
+        <td><input type="number" value="30"></td>
+        <td class="type-heat">升溫</td>
+        <td class="rate">2.00</td>
+      </tr>
+      <tr>
+        <td class="stage-num">5</td>
+        <td><input type="number" value="130"></td>
+        <td><input type="number" value="130"></td>
+        <td><input type="number" value="30"></td>
+        <td class="type-hold">持溫</td>
+        <td class="rate">—</td>
+      </tr>
+      <tr>
+        <td class="stage-num">6</td>
+        <td><input type="number" value="130"></td>
+        <td><input type="number" value="90"></td>
+        <td><input type="number" value="20"></td>
+        <td class="type-cool">降溫</td>
+        <td class="rate">-2.00</td>
+      </tr>
+      <tr>
+        <td class="stage-num">7</td>
+        <td><input type="number" value="90"></td>
+        <td><input type="number" value="90"></td>
+        <td><input type="number" value="10"></td>
+        <td class="type-hold">持溫</td>
+        <td class="rate">—</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="btn-row">
+  <button id="addStageBtn" class="btn-add">＋ 新增階段</button>
+  <button id="delStageBtn" class="btn-del">－ 刪除最後階段</button>
+</div>
+
+<!-- 溫度曲線圖 -->
+<div class="chart-wrap">
+  <div class="chart-header">
+    <span class="chart-proc-name" id="chartProcName">—</span>
+    <span class="chart-proc-time">總染程時間：<span id="chartTotalTime">—</span> min</span>
+  </div>
+  <div class="chart-title">溫度時間曲線</div>
+  <div class="chart-area">
+    <svg id="mainChart" viewBox="0 0 700 467" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arr-red" markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto">
+          <path d="M0,0 L8,4 L0,8 Z" fill="#922b21"/>
+        </marker>
+      </defs>
+      <g id="chart-dynamic"></g>
+    </svg>
+  </div>
+</div>
+
+<!-- 動作標示設定 -->
+<div class="action-wrap">
+  <div class="section-title">動作標示</div>
+  <table id="actionTable">
+    <thead>
+      <tr>
+        <th>觸發溫度 °C</th>
+        <th>動作說明</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><input type="number" value="30"></td>
+        <td><input type="text" class="action-input-text" value="加入助劑"></td>
+        <td><button class="btn-remove">✕</button></td>
+      </tr>
+      <tr>
+        <td><input type="number" value="30"></td>
+        <td><input type="text" class="action-input-text" value="加入染料"></td>
+        <td><button class="btn-remove">✕</button></td>
+      </tr>
+      <tr>
+        <td><input type="number" value="50"></td>
+        <td><input type="text" class="action-input-text" value="加入酸"></td>
+        <td><button class="btn-remove">✕</button></td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="btn-row" style="margin-top:12px;margin-bottom:0">
+    <button id="addActionBtn" class="btn-add">＋ 新增動作</button>
+  </div>
+</div>
+
+<!-- Google Sheets 直接上傳 -->
+<div class="upload-wrap">
+  <div class="section-title">上傳至 Google Sheets</div>
+  <div class="upload-url-row">
+    <button id="uploadBtn" class="btn-upload">上傳至 Google Sheets（表格＋圖）</button>
+    <a href="https://docs.google.com/spreadsheets/d/1q7e2yjphF0gnX4Wg_c5tYLmVNK8_0YnpAYMmXahMfTs/edit" target="_blank" class="btn-export" style="text-decoration:none;padding:9px 18px">開啟 Google Sheets</a>
+  </div>
+  <div class="upload-status" id="uploadStatus"></div>
+
+</div>
+
+<!-- 匯出 -->
+<div class="export-wrap">
+  <div class="section-title">匯出至 Google Sheets</div>
+  <div class="export-btns">
+    <button id="copyTableBtn" class="btn-export">複製表格資料（貼入 Google Sheets）</button>
+    <button id="exportPNGBtn" class="btn-export">下載曲線圖 PNG</button>
+    <button id="exportCSVBtn" class="btn-export">下載 CSV</button>
+  </div>
+  <p class="export-tip">複製表格後，在 Google Sheets 空白格按 Ctrl+V 即可貼上所有欄位。PNG 下載後可在 Sheets 選「插入 → 圖片」。</p>
+</div>
+
+</div><!-- /.page-wrap -->
+<script>
+// ── 圖表區域常數 ──────────────────────────────────────────────
+const CX = { x0: 60, x1: 680, y0: 20, y1: 260 };
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+// ── 資料讀取 ──────────────────────────────────────────────────
+function readStages() {
+  return [...document.querySelectorAll('#stageTable tbody tr')]
+    .map(row => {
+      const n = [...row.querySelectorAll('input[type="number"]')];
+      if (n.length < 3) return null;
+      const s = parseFloat(n[0].value);
+      const e = parseFloat(n[1].value);
+      const t = parseFloat(n[2].value);
+      return (isNaN(s) || isNaN(e) || isNaN(t) || t <= 0) ? null : { s, e, t };
+    })
+    .filter(Boolean);
+}
+
+function readActions() {
+  return [...document.querySelectorAll('#actionTable tbody tr')]
+    .map(row => {
+      const ti = row.querySelector('input[type="number"]');
+      const li = row.querySelector('.action-input-text');
+      if (!ti || !li) return null;
+      const temp = parseFloat(ti.value);
+      const label = li.value.trim();
+      return (!isNaN(temp) && label) ? { temp, label } : null;
+    })
+    .filter(Boolean);
+}
+
+// ── 比例尺 ────────────────────────────────────────────────────
+function makeScale(stages) {
+  const temps = stages.flatMap(st => [st.s, st.e]);
+  const minT = Math.min(...temps);
+  const maxT = Math.max(...temps);
+  const total = stages.reduce((a, st) => a + st.t, 0);
+  const tRange = (maxT - minT) || 1;
+  const W = CX.x1 - CX.x0;
+  const H = CX.y1 - CX.y0;
+  return {
+    x:    time => CX.x0 + (time / total) * W,
+    y:    temp => CX.y1 - ((temp - minT) / tRange) * H,
+    minT, maxT, total,
+    uniqTemps: [...new Set(temps)].sort((a, b) => a - b)
+  };
+}
+
+// ── 曲線關鍵點 ────────────────────────────────────────────────
+function curvePoints(stages) {
+  const pts = [{ time: 0, temp: stages[0].s }];
+  let t = 0;
+  stages.forEach(st => { t += st.t; pts.push({ time: t, temp: st.e }); });
+  return pts;
+}
+
+// ── 找溫度對應時間 ────────────────────────────────────────────
+function timeAtTemp(stages, target) {
+  let t = 0;
+  for (const st of stages) {
+    if (Math.abs(st.s - st.e) < 0.001) {
+      if (Math.abs(st.s - target) < 0.001) return t;
+    } else {
+      const lo = Math.min(st.s, st.e), hi = Math.max(st.s, st.e);
+      if (target >= lo - 0.001 && target <= hi + 0.001) {
+        return t + Math.max(0, Math.min(1, (target - st.s) / (st.e - st.s))) * st.t;
+      }
+    }
+    t += st.t;
+  }
+  return null;
+}
+
+// ── 建立 SVG 元素 ─────────────────────────────────────────────
+function se(tag, attrs) {
+  const el = document.createElementNS(SVG_NS, tag);
+  Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, v));
+  return el;
+}
+function st(x, y, content, attrs = {}) {
+  const el = se('text', { x, y, ...attrs });
+  el.textContent = content;
+  return el;
+}
+
+// ── 更新基本資訊（名稱、總時間）────────────────────────────────
+function updateMeta() {
+  const stages = readStages();
+  const total  = stages.reduce((a, s) => a + s.t, 0);
+  const timeStr = total > 0 ? total : '—';
+  document.getElementById('totalTimeVal').textContent  = timeStr;
+  document.getElementById('chartTotalTime').textContent = timeStr;
+
+  const name = document.getElementById('processName').value.trim() || '（未命名）';
+  document.getElementById('chartProcName').textContent = '染程 ' + name;
+}
+
+// ── 主渲染 ────────────────────────────────────────────────────
+function renderChart() {
+  updateMeta();
+  const stages = readStages();
+  const g = document.getElementById('chart-dynamic');
+  while (g.firstChild) g.removeChild(g.firstChild);
+  if (!stages.length) return;
+
+  const sc = makeScale(stages);
+  const pts = curvePoints(stages);
+  const actions = readActions();
+  const f1 = v => Math.round(v * 10) / 10;
+
+  // ── Y 格線 + 標籤 ──
+  sc.uniqTemps.forEach(temp => {
+    const yv = f1(sc.y(temp));
+    const isMin = temp === sc.minT;
+    g.appendChild(se('line', {
+      x1: CX.x0, y1: yv, x2: CX.x1, y2: yv,
+      stroke: isMin ? '#555' : '#bbb',
+      'stroke-width': isMin ? '1.5' : '1',
+      ...(isMin ? {} : { 'stroke-dasharray': '4,3' })
+    }));
+    g.appendChild(st(58, yv + 4, temp, {
+      'font-size': '12', 'text-anchor': 'end', fill: '#333'
+    }));
+  });
+
+  // ── Y 軸線 + 標題 ──
+  g.appendChild(se('line', {
+    x1: CX.x0, y1: CX.y0, x2: CX.x0, y2: CX.y1,
+    stroke: '#555', 'stroke-width': '1.5'
+  }));
+  g.appendChild(st(22, 145, '溫度 °C', {
+    'font-size': '11', fill: '#333', transform: 'rotate(-90,22,145)'
+  }));
+
+  // ── 各節點垂直引線 + X 刻度 + 時間標籤 ──
+  pts.forEach(pt => {
+    const xv = f1(sc.x(pt.time));
+    const yv = f1(sc.y(pt.temp));
+    if (yv < CX.y1 - 1) {
+      g.appendChild(se('line', {
+        x1: xv, y1: yv, x2: xv, y2: CX.y1,
+        stroke: '#999', 'stroke-width': '1', 'stroke-dasharray': '3,2'
+      }));
+    }
+    g.appendChild(se('line', {
+      x1: xv, y1: CX.y1, x2: xv, y2: CX.y1 + 7,
+      stroke: '#555', 'stroke-width': '1.5'
+    }));
+    g.appendChild(st(xv, CX.y1 + 19, Math.round(pt.time), {
+      'font-size': '12', 'text-anchor': 'middle', fill: '#333'
+    }));
+  });
+  g.appendChild(st((CX.x0 + CX.x1) / 2, CX.y1 + 34, '時間 min', {
+    'font-size': '12', 'text-anchor': 'middle', fill: '#444'
+  }));
+
+  // ── 溫度曲線 ──
+  g.appendChild(se('polyline', {
+    points: pts.map(p => `${f1(sc.x(p.time))},${f1(sc.y(p.temp))}`).join(' '),
+    fill: 'none', stroke: '#1a5276', 'stroke-width': '3',
+    'stroke-linejoin': 'round', 'stroke-linecap': 'round'
+  }));
+
+  // ── 節點圓點 ──
+  pts.forEach(pt => {
+    g.appendChild(se('circle', {
+      cx: f1(sc.x(pt.time)), cy: f1(sc.y(pt.temp)), r: '4', fill: '#1a5276'
+    }));
+  });
+
+  // ── 各階段標籤（持溫：溫度×時間；升降溫：速率旁標）──
+  let t = 0;
+  stages.forEach(stage => {
+    const { s: sT, e: eT, t: dur } = stage;
+    const tMid = t + dur / 2;
+    const xMid = sc.x(tMid);
+    const isHold = Math.abs(sT - eT) < 0.001;
+
+    if (isHold) {
+      // 持溫標籤：上方置中
+      const yv = sc.y(sT);
+      g.appendChild(st(f1(xMid), f1(yv - 9), `${sT}°C × ${dur}'`, {
+        'font-size': '12', 'text-anchor': 'middle',
+        fill: '#1a5276', 'font-weight': 'bold'
+      }));
+    } else {
+      // 升降溫速率：貼近斜線段，左側或右側
+      const yMid = f1((sc.y(sT) + sc.y(eT)) / 2);
+      const rate = ((eT - sT) / dur).toFixed(2);
+      if (eT > sT) {
+        // 升溫：標籤在右側下方（text-anchor=start，離曲線 10px）
+        g.appendChild(st(f1(xMid + 10), yMid + 12, `${rate}°C/min`, {
+          'font-size': '12', 'text-anchor': 'start', fill: '#333'
+        }));
+      } else {
+        // 降溫：標籤在右側（text-anchor=start，離曲線 10px）
+        g.appendChild(st(f1(xMid + 10), yMid + 4, `${rate}°C/min`, {
+          'font-size': '12', 'text-anchor': 'start', fill: '#333'
+        }));
+      }
+    }
+    t += dur;
+  });
+
+  // ── 動作標示（箭頭 + 水平標籤）──
+  // 依 x 位置分組，相同位置上下交錯
+  const grouped = {};
+  actions.forEach(act => {
+    const at = timeAtTemp(stages, act.temp);
+    if (at === null) return;
+    const key = Math.round(sc.x(at));
+    if (!grouped[key]) grouped[key] = [];
+    grouped[key].push(act.label);
+  });
+
+  // 時間標籤 y=279，"時間 min" 標題 y=294，動作標籤從 y=310 往下排
+  Object.entries(grouped).forEach(([xStr, labels]) => {
+    const xv = parseFloat(xStr);
+    labels.forEach((label, i) => {
+      const yArrowTip = CX.y1 + 4;          // 264，緊貼時間軸下方
+      const yLabel    = CX.y1 + 50 + i * 18; // 310, 328, ... 在時間 min 標題下方
+      g.appendChild(se('line', {
+        x1: xv, y1: yLabel - 4, x2: xv, y2: yArrowTip,
+        stroke: '#922b21', 'stroke-width': '2',
+        'marker-end': 'url(#arr-red)'
+      }));
+      g.appendChild(st(xv + 4, yLabel, label, {
+        'font-size': '12', fill: '#922b21', 'font-weight': 'bold'
+      }));
+    });
+  });
+}
+
+// ── 表格列更新（類型 + 速率）──────────────────────────────────
+function updateRow(row) {
+  const n = [...row.querySelectorAll('input[type="number"]')];
+  if (n.length < 3) return;
+  const s = parseFloat(n[0].value), e = parseFloat(n[1].value), t = parseFloat(n[2].value);
+
+  const typeCell = row.querySelector('.type-hold, .type-heat, .type-cool') ||
+                   row.cells[4];
+  const rateCell = row.querySelector('.rate');
+
+  if (isNaN(s) || isNaN(e) || isNaN(t) || t <= 0) {
+    if (typeCell) { typeCell.className = ''; typeCell.textContent = '—'; }
+    if (rateCell) rateCell.textContent = '—';
+    return;
+  }
+  if (typeCell) {
+    typeCell.className = s === e ? 'type-hold' : e > s ? 'type-heat' : 'type-cool';
+    typeCell.textContent = s === e ? '持溫' : e > s ? '升溫' : '降溫';
+  }
+  if (rateCell) {
+    rateCell.textContent = s === e ? '—' : ((e - s) / t).toFixed(2);
+  }
+}
+
+// ── 新增 / 刪除階段 ───────────────────────────────────────────
+function addStageRow() {
+  const tbody = document.querySelector('#stageTable tbody');
+  const rows = tbody.querySelectorAll('tr');
+  const num = rows.length + 1;
+  const lastInputs = rows.length
+    ? [...rows[rows.length - 1].querySelectorAll('input[type="number"]')]
+    : [];
+  const prevEnd = lastInputs[1] ? lastInputs[1].value : '';
+
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td class="stage-num">${num}</td>
+    <td><input type="number" value="${prevEnd}"></td>
+    <td><input type="number" value=""></td>
+    <td><input type="number" value=""></td>
+    <td class="type-hold">—</td>
+    <td class="rate">—</td>`;
+  tbody.appendChild(tr);
+  attachRowListeners(tr);
+}
+
+function deleteLastRow() {
+  const tbody = document.querySelector('#stageTable tbody');
+  const rows = tbody.querySelectorAll('tr');
+  if (rows.length > 1) { tbody.removeChild(rows[rows.length - 1]); renderChart(); }
+}
+
+// ── 新增動作列 ────────────────────────────────────────────────
+function addActionRow() {
+  const tbody = document.querySelector('#actionTable tbody');
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><input type="number" value=""></td>
+    <td><input type="text" class="action-input-text" value=""></td>
+    <td><button class="btn-remove">✕</button></td>`;
+  tbody.appendChild(tr);
+  attachActionRowListeners(tr);
+}
+
+// ── 事件綁定 ──────────────────────────────────────────────────
+function attachRowListeners(row) {
+  row.querySelectorAll('input[type="number"]').forEach(inp => {
+    inp.addEventListener('input', () => { updateRow(row); renderChart(); });
+  });
+}
+
+function attachActionRowListeners(row) {
+  row.querySelectorAll('input').forEach(inp =>
+    inp.addEventListener('input', renderChart)
+  );
+  const rmBtn = row.querySelector('.btn-remove');
+  if (rmBtn) rmBtn.addEventListener('click', () => { row.remove(); renderChart(); });
+}
+
+// ── Canvas 2D 重繪（含名稱/時間標頭，高度依內容動態計算）──────
+function renderToCanvas() {
+  const stages = readStages();
+  if (!stages.length) return null;
+  const sc      = makeScale(stages);
+  const pts     = curvePoints(stages);
+  const actions = readActions();
+  const procName  = document.getElementById('processName').value.trim() || '（未命名）';
+  const totalTime = stages.reduce((a,s) => a+s.t, 0);
+
+  // 計算動作標示最多幾行（決定底部高度）
+  const grpCount = {};
+  actions.forEach(act => {
+    const at = timeAtTemp(stages, act.temp);
+    if (at === null) return;
+    const k = Math.round(sc.x(at));
+    grpCount[k] = (grpCount[k]||0) + 1;
+  });
+  const maxRows = Object.values(grpCount).reduce((m,v)=>Math.max(m,v), 0);
+  const actionH = maxRows > 0 ? 55 + (maxRows-1)*18 : 42;
+
+  const S   = 2;                           // 解析度倍率（2 = 1400px 輸出）
+  const HDR = 44;                          // 頂部名稱+時間區高度
+  const VW  = 700;
+  const VH  = CX.y1 + actionH + 16;       // 曲線圖有效高度
+
+  const cv = document.createElement('canvas');
+  cv.width  = VW  * S;
+  cv.height = (HDR + VH) * S;
+  const c = cv.getContext('2d');
+  c.scale(S, S);                           // 所有繪圖座標保持不變，輸出放大 S 倍
+  c.fillStyle = '#fff';
+  c.fillRect(0, 0, VW, HDR + VH);
+
+  // ── 標頭：染程名稱 + 總時間 ──
+  c.font = 'bold 18px Arial,sans-serif';
+  c.fillStyle = '#1a5276';
+  c.textAlign = 'left';
+  c.textBaseline = 'alphabetic';
+  c.fillText('染程 ' + procName, CX.x0, 26);
+
+  c.font = '15px Arial,sans-serif';
+  c.fillStyle = '#444';
+  c.fillText('總染程時間：' + totalTime + ' min', CX.x0 + 300, 26);
+
+  // ── 曲線圖區域（向下偏移 HDR）──
+  c.save();
+  c.translate(0, HDR);
+
+  const f = v => Math.round(v*10)/10;
+  const ln = (x1,y1,x2,y2,col,w,dash=[]) => {
+    c.beginPath(); c.strokeStyle=col; c.lineWidth=w; c.setLineDash(dash);
+    c.moveTo(x1,y1); c.lineTo(x2,y2); c.stroke(); c.setLineDash([]);
+  };
+  const tx = (x,y,s,fs,col,align='left',bold=false) => {
+    c.font=(bold?'bold ':'')+fs+'px Arial,sans-serif';
+    c.fillStyle=col; c.textAlign=align; c.textBaseline='alphabetic';
+    c.fillText(s,x,y);
+  };
+
+  // Y 格線＋標籤
+  sc.uniqTemps.forEach(temp => {
+    const yv=f(sc.y(temp)), isMin=temp===sc.minT;
+    ln(CX.x0,yv,CX.x1,yv,isMin?'#555':'#bbb',isMin?1.5:1,isMin?[]:[4,3]);
+    tx(58,yv+5,String(temp),13,'#333','right');
+  });
+  ln(CX.x0,CX.y0,CX.x0,CX.y1,'#555',1.5);
+  c.save(); c.translate(22,145); c.rotate(-Math.PI/2);
+  tx(0,0,'溫度 °C',13,'#333','center'); c.restore();
+
+  // 引線＋X 刻度＋時間標籤
+  pts.forEach(pt => {
+    const xv=f(sc.x(pt.time)), yv=f(sc.y(pt.temp));
+    if (yv<CX.y1-1) ln(xv,yv,xv,CX.y1,'#999',1,[3,2]);
+    ln(xv,CX.y1,xv,CX.y1+7,'#555',1.5);
+    tx(xv,CX.y1+20,String(Math.round(pt.time)),13,'#333','center');
+  });
+  tx((CX.x0+CX.x1)/2,CX.y1+36,'時間 min',13,'#444','center');
+
+  // 曲線
+  c.beginPath(); c.strokeStyle='#1a5276'; c.lineWidth=3;
+  c.lineJoin='round'; c.lineCap='round';
+  pts.forEach((pt,i)=>{
+    const xv=f(sc.x(pt.time)),yv=f(sc.y(pt.temp));
+    i===0?c.moveTo(xv,yv):c.lineTo(xv,yv);
+  });
+  c.stroke();
+
+  // 節點
+  pts.forEach(pt=>{
+    c.beginPath();
+    c.arc(f(sc.x(pt.time)),f(sc.y(pt.temp)),4,0,2*Math.PI);
+    c.fillStyle='#1a5276'; c.fill();
+  });
+
+  // 階段標籤
+  let t=0;
+  stages.forEach(st=>{
+    const {s:sT,e:eT,t:dur}=st;
+    const xMid=sc.x(t+dur/2);
+    if (Math.abs(sT-eT)<0.001) {
+      tx(f(xMid),f(sc.y(sT)-10),sT+'°C × '+dur+"'",13,'#1a5276','center',true);
+    } else {
+      const yMid=f((sc.y(sT)+sc.y(eT))/2);
+      const rate=((eT-sT)/dur).toFixed(2);
+      eT>sT
+        ?tx(f(xMid-10),yMid+13,rate+'°C/min',13,'#333','right')
+        :tx(f(xMid+10),yMid+5, rate+'°C/min',13,'#333','left');
+    }
+    t+=dur;
+  });
+
+  // 動作標示
+  const grp={};
+  actions.forEach(act=>{
+    const at=timeAtTemp(stages,act.temp);
+    if (at===null) return;
+    const k=Math.round(sc.x(at));
+    if (!grp[k]) grp[k]=[];
+    grp[k].push(act.label);
+  });
+  Object.entries(grp).forEach(([xStr,labels])=>{
+    const xv=parseFloat(xStr);
+    labels.forEach((lbl,i)=>{
+      const yA=CX.y1+4, yL=CX.y1+50+i*18;
+      ln(xv,yL-4,xv,yA,'#922b21',2);
+      c.beginPath(); c.fillStyle='#922b21';
+      c.moveTo(xv,yA); c.lineTo(xv-4,yA+8); c.lineTo(xv+4,yA+8);
+      c.closePath(); c.fill();
+      tx(xv+4,yL,lbl,13,'#922b21','left',true);
+    });
+  });
+
+  c.restore(); // 取消 translate(0, HDR)
+  return cv.toDataURL('image/png');
+}
+
+// ── 上傳至 Google Sheets（via Apps Script）────────────────────
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzlzZus1wHcoy_p0rGnqhLnJ8jPOUQkLySm-Q6RjnldCWqQYqpcfhF5D3ztUbCllWQ5/exec';
+
+function uploadToSheets() {
+  const url = GAS_URL;
+  const status = document.getElementById('uploadStatus');
+
+  status.className = 'upload-status'; status.textContent = '準備中…';
+
+  // 收集資料
+  const stages = [...document.querySelectorAll('#stageTable tbody tr')].map((row, i) => {
+    const n = [...row.querySelectorAll('input[type="number"]')];
+    if (n.length < 3 || (!n[0].value && !n[2].value)) return null;
+    const type = (row.querySelector('.type-hold,.type-heat,.type-cool') || {}).textContent || '';
+    const rate = (row.querySelector('.rate') || {}).textContent || '';
+    return { stage: i+1, startTemp: +n[0].value, endTemp: +n[1].value, time: +n[2].value, type, rate };
+  }).filter(Boolean);
+
+  const processName = document.getElementById('processName').value.trim() || '染程資料';
+  const totalTime   = stages.reduce((a, s) => a + s.time, 0);
+
+  // 直接用 Canvas 2D 重繪圖表
+  status.textContent = '產生圖片中…';
+  let chartImage = null;
+  try { chartImage = renderToCanvas(); } catch(e) { console.error('renderToCanvas:', e); }
+
+  const kb = chartImage ? Math.round(chartImage.length / 1024) : 0;
+  status.textContent = chartImage
+    ? `[v2] 圖片已產生 (${kb} KB)，上傳中…`
+    : '⚠ 圖片產生失敗，只送表格';
+
+  const payload = { processName, totalTime, stages, chartImage };
+
+  fetch(url, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(payload)
+  })
+  .then(() => {
+    status.className = 'upload-status ok';
+    status.textContent = chartImage
+      ? '✓ 表格＋圖片已送出！請至 Google Sheets 確認（工作表：' + processName + '）'
+      : '✓ 表格已送出（無圖片）';
+  })
+  .catch(err => {
+    status.className = 'upload-status err';
+    status.textContent = '送出失敗：' + err.message;
+  });
+}
+
+// ── 匯出：複製表格 TSV（直接貼入 Google Sheets）────────────────
+function copyTableTSV() {
+  const header = '階段\t初始溫度°C\t結束溫度°C\t時間min\t類型\t升溫速率°C/min';
+  const lines = [...document.querySelectorAll('#stageTable tbody tr')].map((row, i) => {
+    const n = [...row.querySelectorAll('input[type="number"]')];
+    if (n.length < 3 || (!n[0].value && !n[2].value)) return null;
+    const type = (row.querySelector('.type-hold,.type-heat,.type-cool') || {}).textContent || '';
+    const rate = (row.querySelector('.rate') || {}).textContent || '';
+    return `${i+1}\t${n[0].value}\t${n[1].value}\t${n[2].value}\t${type}\t${rate}`;
+  }).filter(Boolean);
+
+  const tsv = [header, ...lines].join('\n');
+  const btn = document.getElementById('copyTableBtn');
+
+  const done = () => {
+    const orig = btn.textContent;
+    btn.textContent = '✓ 已複製！請至 Google Sheets 按 Ctrl+V';
+    btn.style.background = '#1e8449';
+    setTimeout(() => { btn.textContent = orig; btn.style.background = ''; }, 3000);
+  };
+
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(tsv).then(done).catch(() => fallbackCopy(tsv, done));
+  } else {
+    fallbackCopy(tsv, done);
+  }
+}
+function fallbackCopy(text, cb) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.cssText = 'position:fixed;opacity:0';
+  document.body.appendChild(ta);
+  ta.select();
+  document.execCommand('copy');
+  document.body.removeChild(ta);
+  cb();
+}
+
+// ── 匯出：下載曲線圖 PNG ──────────────────────────────────────
+function exportPNG() {
+  const svg = document.getElementById('mainChart');
+  const svgData = new XMLSerializer().serializeToString(svg);
+  const scale  = 2;
+  const canvas = document.createElement('canvas');
+  canvas.width  = 700 * scale;
+  canvas.height = 467 * scale;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const img  = new Image();
+  img.onload = () => {
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    URL.revokeObjectURL(url);
+    const name = document.getElementById('processName').value.trim() || '染程曲線';
+    const a = document.createElement('a');
+    a.download = `${name}.png`;
+    a.href = canvas.toDataURL('image/png');
+    a.click();
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); alert('PNG 匯出失敗，請改用截圖方式。'); };
+  img.src = url;
+}
+
+// ── 匯出：下載 CSV ────────────────────────────────────────────
+function exportCSV() {
+  const header = '階段,初始溫度°C,結束溫度°C,時間min,類型,升溫速率°C/min\n';
+  const lines = [...document.querySelectorAll('#stageTable tbody tr')].map((row, i) => {
+    const n = [...row.querySelectorAll('input[type="number"]')];
+    if (n.length < 3 || (!n[0].value && !n[2].value)) return null;
+    const type = (row.querySelector('.type-hold,.type-heat,.type-cool') || {}).textContent || '';
+    const rate = (row.querySelector('.rate') || {}).textContent || '';
+    return `${i+1},${n[0].value},${n[1].value},${n[2].value},${type},${rate}`;
+  }).filter(Boolean);
+
+  const csv  = '﻿' + header + lines.join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const name = document.getElementById('processName').value.trim() || '染程資料';
+  const a = document.createElement('a');
+  a.download = `${name}.csv`;
+  a.href = url;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── 初始化 ────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('#stageTable tbody tr').forEach(attachRowListeners);
+  document.querySelectorAll('#actionTable tbody tr').forEach(attachActionRowListeners);
+
+  document.getElementById('addStageBtn').addEventListener('click', addStageRow);
+  document.getElementById('delStageBtn').addEventListener('click', deleteLastRow);
+  document.getElementById('addActionBtn').addEventListener('click', addActionRow);
+  document.getElementById('processName').addEventListener('input', updateMeta);
+
+  document.getElementById('uploadBtn').addEventListener('click', uploadToSheets);
+  document.getElementById('copyTableBtn').addEventListener('click', copyTableTSV);
+  document.getElementById('exportPNGBtn').addEventListener('click', exportPNG);
+  document.getElementById('exportCSVBtn').addEventListener('click', exportCSV);
+
+  renderChart();
+});
+</script>
+
+</body>
+</html>
