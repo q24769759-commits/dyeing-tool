@@ -163,12 +163,93 @@
       white-space: pre; overflow-x: auto; margin: 8px 0;
     }
     .gas-steps { padding-left: 18px; line-height: 2; color: #444; }
+
+/* ── 分頁列 ── */
+.tab-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 10px 16px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.12);
+  flex-wrap: wrap;
+}
+.tab-btn {
+  padding: 7px 20px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 15px;
+  font-family: inherit;
+  background: #e8e8e8;
+  color: #555;
+}
+.tab-btn.tab-active { background: #4a7c9e; color: #fff; }
+.tab-divider { width: 1px; height: 24px; background: #ddd; margin: 0 4px; flex-shrink: 0; }
+#tabViewPanel {
+  display: none;
+  flex: 1;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+#tabViewPanel select {
+  max-width: 320px;
+  min-width: 160px;
+  border: 1px solid #bbb;
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 15px;
+  font-family: inherit;
+  color: #222;
+}
+.btn-load { background: #4a7c9e; color: #fff; }
+.btn-save-lib     { background: #1e8449; color: #fff; }
+.view-badge {
+  display: none;
+  background: #d6eaf8;
+  color: #1a5276;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 13px;
+  font-weight: bold;
+}
+/* 唯讀模式：inputs 看起來像文字 */
+input[type="number"]:disabled,
+input[type="text"]:disabled {
+  background: transparent;
+  color: #333;
+  border-color: transparent;
+  cursor: default;
+}
+td input[type="number"]:disabled:focus,
+input[type="text"]:disabled:focus {
+  background: transparent;
+  outline: none;
+}
   </style>
 </head>
 <body>
 <div class="page-wrap">
 
 <h1>染程工具</h1>
+
+<!-- 分頁 -->
+<div class="tab-bar">
+  <button id="tabView" class="tab-btn">檢視</button>
+  <button id="tabWrite" class="tab-btn tab-active">寫入</button>
+  <span class="tab-divider"></span>
+  <div id="tabViewPanel">
+    <select id="librarySelect">
+      <option value="">— 選擇染程 —</option>
+    </select>
+    <button id="loadBtn" class="btn-add btn-load">載入</button>
+    <span class="view-badge" id="viewBadge">檢視模式</span>
+    <span id="libraryStatus" style="font-size:13px;color:#888;"></span>
+  </div>
+</div>
 
 <!-- 染程基本資訊 -->
 <div class="process-meta">
@@ -260,6 +341,7 @@
 <div class="btn-row">
   <button id="addStageBtn" class="btn-add">＋ 新增階段</button>
   <button id="delStageBtn" class="btn-del">－ 刪除最後階段</button>
+  <button id="saveLibBtn" class="btn-save-lib">存入染程庫</button>
 </div>
 
 <!-- 溫度曲線圖 -->
@@ -927,6 +1009,160 @@ function exportCSV() {
   URL.revokeObjectURL(url);
 }
 
+// ── 染程庫：讀取清單 ──────────────────────────────────────────
+async function fetchLibraryList() {
+  const status = document.getElementById('libraryStatus');
+  try {
+    const res = await fetch(GAS_URL + '?action=list');
+    const data = await res.json();
+    const sel = document.getElementById('librarySelect');
+    sel.innerHTML = '<option value="">— 選擇染程 —</option>';
+    (data.names || []).forEach(name => {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      sel.appendChild(opt);
+    });
+  } catch (e) {
+    status.textContent = '無法載入染程庫';
+  }
+}
+
+function populateTableFromStages(stages) {
+  const tbody = document.querySelector('#stageTable tbody');
+  tbody.innerHTML = '';
+  stages.forEach((st, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="stage-num">${i + 1}</td>
+      <td><input type="number" value="${st.s}"></td>
+      <td><input type="number" value="${st.e}"></td>
+      <td><input type="number" value="${st.t}"></td>
+      <td class="type-hold">—</td>
+      <td class="rate">—</td>`;
+    tbody.appendChild(tr);
+    updateRow(tr);
+    attachRowListeners(tr);
+  });
+}
+
+function populateActionsFromData(actions) {
+  const tbody = document.querySelector('#actionTable tbody');
+  tbody.innerHTML = '';
+  actions.forEach(act => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input type="number" value="${act.temp}"></td>
+      <td><input type="text" class="action-input-text" value="${String(act.label).replace(/"/g, '&quot;')}"></td>
+      <td><button class="btn-remove">✕</button></td>`;
+    tbody.appendChild(tr);
+    attachActionRowListeners(tr);
+  });
+}
+
+async function loadProcess(name) {
+  const status = document.getElementById('libraryStatus');
+  status.textContent = '載入中…';
+  try {
+    const res = await fetch(GAS_URL + '?action=get&name=' + encodeURIComponent(name));
+    const data = await res.json();
+    if (data.error) { status.textContent = '找不到染程'; return; }
+    populateTableFromStages(data.stages || []);
+    populateActionsFromData(data.actions || []);
+    document.getElementById('processName').value = name;
+    renderChart();
+    enterViewMode(name);
+    status.textContent = '';
+  } catch (e) {
+    status.textContent = '載入失敗，請重試';
+  }
+}
+
+function enterViewMode(name) {
+  document.querySelectorAll('#stageTable input, #actionTable input, #processName')
+    .forEach(el => { el.disabled = true; });
+  document.querySelectorAll('#actionTable .btn-remove')
+    .forEach(btn => { btn.disabled = true; });
+  document.getElementById('addStageBtn').style.display  = 'none';
+  document.getElementById('delStageBtn').style.display  = 'none';
+  document.getElementById('addActionBtn').style.display = 'none';
+  document.getElementById('saveLibBtn').style.display   = 'none';
+  document.getElementById('viewBadge').style.display    = 'inline-block';
+  document.getElementById('tabView').classList.add('tab-active');
+  document.getElementById('tabWrite').classList.remove('tab-active');
+}
+
+function enterDesignMode() {
+  document.querySelectorAll('#stageTable input, #actionTable input, #processName')
+    .forEach(el => { el.disabled = false; });
+  document.querySelectorAll('#actionTable .btn-remove')
+    .forEach(btn => { btn.disabled = false; });
+  document.getElementById('addStageBtn').style.display  = '';
+  document.getElementById('delStageBtn').style.display  = '';
+  document.getElementById('addActionBtn').style.display = '';
+  document.getElementById('saveLibBtn').style.display   = '';
+  document.getElementById('librarySelect').value        = '';
+  document.getElementById('processName').value          = '';
+  document.getElementById('libraryStatus').textContent  = '';
+  const tbody = document.querySelector('#stageTable tbody');
+  tbody.innerHTML = `<tr>
+    <td class="stage-num">1</td>
+    <td><input type="number" value=""></td>
+    <td><input type="number" value=""></td>
+    <td><input type="number" value=""></td>
+    <td class="type-hold">—</td>
+    <td class="rate">—</td></tr>`;
+  document.querySelectorAll('#stageTable tbody tr').forEach(attachRowListeners);
+  document.querySelector('#actionTable tbody').innerHTML = '';
+  renderChart();
+}
+
+async function saveToLibrary() {
+  const name = document.getElementById('processName').value.trim();
+  if (!name) { alert('請先輸入染程名稱'); return; }
+  const stages = readStages();
+  if (!stages.length) { alert('請先輸入染程階段'); return; }
+  const password = prompt('請輸入儲存密碼：');
+  if (password === null) return;
+
+  const actions = readActions();
+  const status = document.getElementById('libraryStatus');
+  status.textContent = '儲存中…';
+  status.style.color = '#888';
+
+  try {
+    const res = await fetch(GAS_URL, {
+      method: 'POST',
+      mode: 'cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'saveToLibrary', password, name, stages, actions })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      status.textContent = '✓ 已存入染程庫';
+      status.style.color = '#1e8449';
+      fetchLibraryList();
+      setTimeout(() => { status.textContent = ''; status.style.color = '#888'; }, 3000);
+    } else {
+      status.textContent = '✗ ' + (data.error === 'wrong password' ? '密碼錯誤' : '儲存失敗');
+      status.style.color = '#c0392b';
+    }
+  } catch (e) {
+    status.textContent = '✗ 儲存失敗，請重試';
+    status.style.color = '#c0392b';
+  }
+}
+
+function switchTab(tab) {
+  const isView = tab === 'view';
+  const wasView = document.getElementById('tabView').classList.contains('tab-active');
+  document.getElementById('tabView').classList.toggle('tab-active', isView);
+  document.getElementById('tabWrite').classList.toggle('tab-active', !isView);
+  document.getElementById('tabViewPanel').style.display = isView ? 'flex' : 'none';
+  if (isView) document.getElementById('viewBadge').style.display = 'none';
+  if (!isView && wasView) enterDesignMode();
+}
+
 // ── 初始化 ────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('#stageTable tbody tr').forEach(attachRowListeners);
@@ -942,6 +1178,16 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('exportPNGBtn').addEventListener('click', exportPNG);
   document.getElementById('exportCSVBtn').addEventListener('click', exportCSV);
 
+  document.getElementById('loadBtn').addEventListener('click', () => {
+    const name = document.getElementById('librarySelect').value;
+    if (name) loadProcess(name);
+  });
+  document.getElementById('saveLibBtn').addEventListener('click', saveToLibrary);
+  document.getElementById('tabView').addEventListener('click', () => switchTab('view'));
+  document.getElementById('tabWrite').addEventListener('click', () => switchTab('write'));
+
+  switchTab('write');
+  fetchLibraryList();
   renderChart();
 });
 </script>
