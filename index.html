@@ -369,14 +369,14 @@ input[type="text"]:disabled:focus {
   <table id="actionTable">
     <thead>
       <tr>
-        <th>觸發溫度 °C</th>
+        <th>觸發時間 min</th>
         <th>動作說明</th>
         <th></th>
       </tr>
     </thead>
     <tbody>
       <tr>
-        <td><input type="number" value="30"></td>
+        <td><input type="number" value="0"></td>
         <td><input type="text" class="action-input-text" value="加入助劑"></td>
         <td><button class="btn-remove">✕</button></td>
       </tr>
@@ -445,9 +445,9 @@ function readActions() {
       const ti = row.querySelector('input[type="number"]');
       const li = row.querySelector('.action-input-text');
       if (!ti || !li) return null;
-      const temp = parseFloat(ti.value);
+      const time = parseFloat(ti.value);
       const label = li.value.trim();
-      return (!isNaN(temp) && label) ? { temp, label } : null;
+      return (!isNaN(time) && label) ? { time, label } : null;
     })
     .filter(Boolean);
 }
@@ -455,7 +455,7 @@ function readActions() {
 // ── 比例尺 ────────────────────────────────────────────────────
 function makeScale(stages) {
   const temps = stages.flatMap(st => [st.s, st.e]);
-  const minT = Math.min(...temps);
+  const minT = Math.min(20, ...temps);
   const maxT = Math.max(...temps);
   const total = stages.reduce((a, st) => a + st.t, 0);
   const tRange = (maxT - minT) || 1;
@@ -465,7 +465,7 @@ function makeScale(stages) {
     x:    time => CX.x0 + (time / total) * W,
     y:    temp => CX.y1 - ((temp - minT) / tRange) * H,
     minT, maxT, total,
-    uniqTemps: [...new Set(temps)].sort((a, b) => a - b)
+    uniqTemps: [...new Set([minT, ...temps])].sort((a, b) => a - b)
   };
 }
 
@@ -629,26 +629,35 @@ function renderChart() {
   // 依 x 位置分組，相同位置上下交錯
   const grouped = {};
   actions.forEach(act => {
-    const at = timeAtTemp(stages, act.temp);
-    if (at === null) return;
-    const key = Math.round(sc.x(at));
+    if (typeof act.time !== 'number') return;
+    if (act.time < 0 || act.time > sc.total) return;
+    const key = Math.round(sc.x(act.time));
     if (!grouped[key]) grouped[key] = [];
     grouped[key].push(act.label);
   });
 
-  // 時間標籤 y=279，"時間 min" 標題 y=294，動作標籤從 y=310 往下排
+  // 時間標籤 y=279，"時間 min" 標題 y=294，動作標籤從 y=326 往下排
   Object.entries(grouped).forEach(([xStr, labels]) => {
     const xv = parseFloat(xStr);
+    let xLabel = xv;
+    let anchor = 'middle';
+    if (xv < CX.x0 + 48) {
+      xLabel = CX.x0 + 10;
+      anchor = 'start';
+    } else if (xv > CX.x1 - 48) {
+      xLabel = CX.x1 - 10;
+      anchor = 'end';
+    }
     labels.forEach((label, i) => {
-      const yArrowTip = CX.y1 + 4;          // 264，緊貼時間軸下方
-      const yLabel    = CX.y1 + 50 + i * 18; // 310, 328, ... 在時間 min 標題下方
+      const yArrowTip = CX.y1 + 4;
+      const yLabel    = CX.y1 + 68 + i * 24;
       g.appendChild(se('line', {
-        x1: xv, y1: yLabel - 4, x2: xv, y2: yArrowTip,
+        x1: xv, y1: yArrowTip, x2: xv, y2: yLabel - 10,
         stroke: '#922b21', 'stroke-width': '2',
         'marker-end': 'url(#arr-red)'
       }));
-      g.appendChild(st(xv + 4, yLabel, label, {
-        'font-size': '12', fill: '#922b21', 'font-weight': 'bold'
+      g.appendChild(st(xLabel, yLabel, label, {
+        'font-size': '12', 'text-anchor': anchor, fill: '#922b21', 'font-weight': 'bold'
       }));
     });
   });
@@ -719,16 +728,39 @@ function addActionRow() {
 }
 
 // ── 事件綁定 ──────────────────────────────────────────────────
+function focusNextTableInput(current) {
+  const inputs = [...document.querySelectorAll('#stageTable input, #actionTable input')]
+    .filter(el => !el.disabled && el.type !== 'button');
+  const idx = inputs.indexOf(current);
+  if (idx >= 0 && idx < inputs.length - 1) {
+    const next = inputs[idx + 1];
+    next.focus();
+    if (next.select) next.select();
+  }
+}
+
 function attachRowListeners(row) {
   row.querySelectorAll('input[type="number"]').forEach(inp => {
     inp.addEventListener('input', () => { updateRow(row); renderChart(); });
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        focusNextTableInput(inp);
+      }
+    });
   });
 }
 
 function attachActionRowListeners(row) {
-  row.querySelectorAll('input').forEach(inp =>
-    inp.addEventListener('input', renderChart)
-  );
+  row.querySelectorAll('input').forEach(inp => {
+    inp.addEventListener('input', renderChart);
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        focusNextTableInput(inp);
+      }
+    });
+  });
   const rmBtn = row.querySelector('.btn-remove');
   if (rmBtn) rmBtn.addEventListener('click', () => { row.remove(); renderChart(); });
 }
@@ -848,21 +880,30 @@ function renderToCanvas() {
   // 動作標示
   const grp={};
   actions.forEach(act=>{
-    const at=timeAtTemp(stages,act.temp);
-    if (at===null) return;
-    const k=Math.round(sc.x(at));
+    if (typeof act.time !== 'number') return;
+    if (act.time < 0 || act.time > sc.total) return;
+    const k=Math.round(sc.x(act.time));
     if (!grp[k]) grp[k]=[];
     grp[k].push(act.label);
   });
   Object.entries(grp).forEach(([xStr,labels])=>{
     const xv=parseFloat(xStr);
+    let xLabel = xv;
+    let align = 'center';
+    if (xv < CX.x0 + 48) {
+      xLabel = CX.x0 + 10;
+      align = 'left';
+    } else if (xv > CX.x1 - 48) {
+      xLabel = CX.x1 - 10;
+      align = 'right';
+    }
     labels.forEach((lbl,i)=>{
-      const yA=CX.y1+4, yL=CX.y1+50+i*18;
-      ln(xv,yL-4,xv,yA,'#922b21',2);
+      const yA=CX.y1+4, yL=CX.y1+68+i*24;
+      ln(xv,yA,xv,yL-10,'#922b21',2);
       c.beginPath(); c.fillStyle='#922b21';
-      c.moveTo(xv,yA); c.lineTo(xv-4,yA+8); c.lineTo(xv+4,yA+8);
+      c.moveTo(xv,yL-4); c.lineTo(xv-4,yL-10); c.lineTo(xv+4,yL-10);
       c.closePath(); c.fill();
-      tx(xv+4,yL,lbl,13,'#922b21','left',true);
+      tx(xLabel,yL,lbl,13,'#922b21',align,true);
     });
   });
 
@@ -1050,10 +1091,12 @@ function populateActionsFromData(actions) {
   const tbody = document.querySelector('#actionTable tbody');
   tbody.innerHTML = '';
   actions.forEach(act => {
+    const time = act.time ?? act.temp;
+    const label = act.label ?? act.action ?? act.name ?? '';
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td><input type="number" value="${act.temp}"></td>
-      <td><input type="text" class="action-input-text" value="${String(act.label).replace(/"/g, '&quot;')}"></td>
+      <td><input type="number" value="${time}"></td>
+      <td><input type="text" class="action-input-text" value="${String(label).replace(/"/g, '&quot;')}"></td>
       <td><button class="btn-remove">✕</button></td>`;
     tbody.appendChild(tr);
     attachActionRowListeners(tr);
