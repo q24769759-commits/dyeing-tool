@@ -1232,6 +1232,16 @@ document.addEventListener('DOMContentLoaded', () => {
   switchTab('write');
   fetchLibraryList();
   renderChart();
+  // 全域捕捉 Enter：若焦點在 stage/action 表格內，按 Enter 跳到下一個欄位
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    const el = document.activeElement;
+    if (!el) return;
+    if (el.tagName === 'INPUT' && (el.closest('#stageTable') || el.closest('#actionTable'))) {
+      e.preventDefault();
+      focusNextTableInput(el);
+    }
+  });
 });
 </script>
 
