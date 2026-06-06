@@ -354,8 +354,8 @@ input[type="text"]:disabled:focus {
   <div class="chart-area">
     <svg id="mainChart" viewBox="0 0 700 467" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <marker id="arr-red" markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto">
-          <path d="M0,0 L8,4 L0,8 Z" fill="#922b21"/>
+        <marker id="arr-red" markerWidth="5" markerHeight="5" refX="5" refY="2.5" orient="auto">
+          <path d="M0,0 L5,2.5 L0,5 Z" fill="#5a8a78"/>
         </marker>
       </defs>
       <g id="chart-dynamic"></g>
@@ -593,7 +593,8 @@ function renderChart() {
 
   // ── 各階段標籤（持溫：溫度×時間；升降溫：速率旁標）──
   let t = 0;
-  stages.forEach(stage => {
+  for (let i = 0; i < stages.length; i++) {
+    const stage = stages[i];
     const { s: sT, e: eT, t: dur } = stage;
     const tMid = t + dur / 2;
     const xMid = sc.x(tMid);
@@ -622,8 +623,23 @@ function renderChart() {
         }));
       }
     }
+
     t += dur;
-  });
+
+    // 若此段與下一段皆為升溫且中間沒有持溫，於交界處標示溫度（與持溫標籤樣式一致）
+    if (i < stages.length - 1) {
+      const next = stages[i + 1];
+      const isHeatCurr = eT > sT;
+      const isHeatNext = next.e > next.s;
+      if (isHeatCurr && isHeatNext) {
+        const xBound = sc.x(t);
+        const yBound = sc.y(eT);
+        g.appendChild(st(f1(xBound), f1(yBound - 9), `${eT}°C`, {
+          'font-size': '12', 'text-anchor': 'middle', fill: '#1a5276', 'font-weight': 'bold'
+        }));
+      }
+    }
+  }
 
   // ── 動作標示（箭頭 + 水平標籤）──
   // 依 x 位置分組，相同位置上下交錯
@@ -649,15 +665,16 @@ function renderChart() {
       anchor = 'end';
     }
     labels.forEach((label, i) => {
-      const yArrowTip = CX.y1 + 4;
+      const yArrowTip = CX.y1;
       const yLabel    = CX.y1 + 68 + i * 24;
       g.appendChild(se('line', {
-        x1: xv, y1: yArrowTip, x2: xv, y2: yLabel - 10,
-        stroke: '#922b21', 'stroke-width': '2',
+        x1: xv, y1: yArrowTip, x2: xv, y2: yLabel - 16,
+        stroke: '#5a8a78', 'stroke-width': '1.5',
+        'stroke-dasharray': '5,4',
         'marker-end': 'url(#arr-red)'
       }));
       g.appendChild(st(xLabel, yLabel, label, {
-        'font-size': '12', 'text-anchor': anchor, fill: '#922b21', 'font-weight': 'bold'
+        'font-size': '12', 'text-anchor': anchor, fill: '#5a8a78', 'font-weight': 'bold'
       }));
     });
   });
@@ -849,21 +866,33 @@ function renderToCanvas() {
   });
 
   // 階段標籤
-  let t=0;
-  stages.forEach(st=>{
-    const {s:sT,e:eT,t:dur}=st;
-    const xMid=sc.x(t+dur/2);
-    if (Math.abs(sT-eT)<0.001) {
-      tx(f(xMid),f(sc.y(sT)-10),sT+'°C × '+dur+"'",13,'#1a5276','center',true);
+  let t = 0;
+  for (let i = 0; i < stages.length; i++) {
+    const st = stages[i];
+    const { s: sT, e: eT, t: dur } = st;
+    const xMid = sc.x(t + dur / 2);
+    if (Math.abs(sT - eT) < 0.001) {
+      tx(f(xMid), f(sc.y(sT) - 10), sT + '°C × ' + dur + "'", 13, '#1a5276', 'center', true);
     } else {
-      const yMid=f((sc.y(sT)+sc.y(eT))/2);
-      const rate=((eT-sT)/dur).toFixed(2);
-      eT>sT
-        ?tx(f(xMid-10),yMid+13,rate+'°C/min',13,'#333','right')
-        :tx(f(xMid+10),yMid+5, rate+'°C/min',13,'#333','left');
+      const yMid = f((sc.y(sT) + sc.y(eT)) / 2);
+      const rate = ((eT - sT) / dur).toFixed(2);
+      eT > sT
+        ? tx(f(xMid - 10), yMid + 13, rate + '°C/min', 13, '#333', 'right')
+        : tx(f(xMid + 10), yMid + 5, rate + '°C/min', 13, '#333', 'left');
     }
-    t+=dur;
-  });
+    t += dur;
+
+    // 若此段與下一段皆為升溫且中間沒有持溫，於交界處標示溫度（與持溫標籤樣式一致）
+    if (i < stages.length - 1) {
+      const next = stages[i + 1];
+      const isHeatCurr = eT > sT;
+      const isHeatNext = next.e > next.s;
+      if (isHeatCurr && isHeatNext) {
+        const xBound = f(sc.x(t));
+        tx(xBound, f(sc.y(eT) - 10), eT + '°C', 13, '#1a5276', 'center', true);
+      }
+    }
+  }
 
   // 動作標示
   const grp={};
@@ -886,12 +915,12 @@ function renderToCanvas() {
       align = 'right';
     }
     labels.forEach((lbl,i)=>{
-      const yA=CX.y1+4, yL=CX.y1+68+i*24;
-      ln(xv,yA,xv,yL-10,'#922b21',2);
-      c.beginPath(); c.fillStyle='#922b21';
-      c.moveTo(xv,yL-4); c.lineTo(xv-4,yL-10); c.lineTo(xv+4,yL-10);
+      const yA=CX.y1, yL=CX.y1+68+i*24;
+      ln(xv,yA,xv,yL-14,'#5a8a78',1.5,[5,4]);
+      c.beginPath(); c.fillStyle='#5a8a78';
+      c.moveTo(xv,yL-8); c.lineTo(xv-3,yL-14); c.lineTo(xv+3,yL-14);
       c.closePath(); c.fill();
-      tx(xLabel,yL,lbl,13,'#922b21',align,true);
+      tx(xLabel,yL,lbl,13,'#5a8a78',align,true);
     });
   });
 
